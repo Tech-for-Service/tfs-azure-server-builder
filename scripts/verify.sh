@@ -148,12 +148,14 @@ check_encryption() {
     
     if [[ -n "$imds_response" && "$imds_response" != *"error"* ]]; then
         check_pass "Running on Azure"
-        
+
         # Parse security profile from IMDS
-        local encryption_at_host=$(echo "$imds_response" | grep -o '"encryptionAtHost":"[^"]*"' | cut -d'"' -f4)
-        local secure_boot=$(echo "$imds_response" | grep -o '"secureBootEnabled":"[^"]*"' | cut -d'"' -f4)
-        local vtpm=$(echo "$imds_response" | grep -o '"virtualTpmEnabled":"[^"]*"' | cut -d'"' -f4)
-        local security_type=$(echo "$imds_response" | grep -o '"securityType":"[^"]*"' | cut -d'"' -f4)
+        set +e  # Temporarily allow grep/cut pipelines to fail without exiting
+        local encryption_at_host=$(echo "$imds_response" | grep -o '"encryptionAtHost":"[^"]*"' 2>/dev/null | cut -d'"' -f4)
+        local secure_boot=$(echo "$imds_response" | grep -o '"secureBootEnabled":"[^"]*"' 2>/dev/null | cut -d'"' -f4)
+        local vtpm=$(echo "$imds_response" | grep -o '"virtualTpmEnabled":"[^"]*"' 2>/dev/null | cut -d'"' -f4)
+        local security_type=$(echo "$imds_response" | grep -o '"securityType":"[^"]*"' 2>/dev/null | cut -d'"' -f4)
+        set -e
         
         # Encryption at Host
         if [[ "$encryption_at_host" == "true" ]]; then

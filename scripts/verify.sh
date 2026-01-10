@@ -285,7 +285,7 @@ check_firewall() {
     check_info "Current UFW rules:"
     ufw status numbered | while read -r line; do
         check_info "  $line"
-    done
+    done || true
     
     # Check for expected rules
     ufw status | grep -q "22/tcp" && check_pass "SSH (22) allowed" || check_fail "SSH (22) not in rules"
@@ -315,7 +315,7 @@ check_fail2ban() {
         check_info "Active jails:"
         fail2ban-client status 2>/dev/null | grep "Jail list" | while read -r line; do
             check_info "  $line"
-        done
+        done || true
         
         # SSH jail status
         if fail2ban-client status sshd &>/dev/null; then
@@ -456,9 +456,9 @@ check_users() {
     # Recent logins (last 10)
     log ""
     check_info "Recent logins (last 10):"
-    last -10 | head -10 | while read -r line; do
+    last -10 2>/dev/null | head -10 | while read -r line; do
         [[ -n "$line" && ! "$line" =~ "wtmp begins" ]] && check_info "  $line"
-    done
+    done || true
 }
 
 # =============================================================================
@@ -667,7 +667,7 @@ cleanup_old_reports() {
     # Find and delete old report files
     while IFS= read -r -d '' file; do
         rm -f "$file"
-        ((deleted_count++))
+        ((deleted_count++)) || true
     done < <(find "$REPORT_DIR" -type f -name "*.txt" -mtime +$days_to_keep -print0 2>/dev/null)
 
     if [[ $deleted_count -gt 0 ]]; then

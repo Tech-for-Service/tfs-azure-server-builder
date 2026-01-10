@@ -29,7 +29,7 @@ HOSTNAME_SHORT=$(hostname -s)
 REPORT_FILE="${REPORT_DIR}/compliance-${HOSTNAME_SHORT}-${TIMESTAMP}.md"
 
 # Azure IMDS API version (latest as of Dec 2025)
-AZURE_IMDS_API_VERSION="2025-04-01"
+AZURE_IMDS_API_VERSION="2025-04-07"
 AZURE_IMDS_URL="http://169.254.169.254/metadata/instance?api-version=${AZURE_IMDS_API_VERSION}"
 
 # Colors
@@ -166,7 +166,11 @@ check_encryption() {
         check_pass "Server-Side Encryption (SSE): Enabled by default on all managed disks"
         
         # Check for Azure Disk Encryption (ADE) - additional OS-level encryption
-        if lsblk | grep -q "crypt"; then
+        set +e  # Temporarily allow grep to fail without exiting
+        lsblk | grep -q "crypt" 2>/dev/null
+        local crypt_found=$?
+        set -e
+        if [[ $crypt_found -eq 0 ]]; then
             check_pass "Azure Disk Encryption (ADE): Enabled (dm-crypt layer active)"
         else
             check_info "Azure Disk Encryption (ADE): Not enabled (optional additional layer)"
@@ -190,7 +194,11 @@ check_encryption() {
         fi
     else
         check_info "Not running on Azure (or IMDS unavailable)"
-        if lsblk | grep -q "crypt"; then
+        set +e  # Temporarily allow grep to fail without exiting
+        lsblk | grep -q "crypt" 2>/dev/null
+        local crypt_found=$?
+        set -e
+        if [[ $crypt_found -eq 0 ]]; then
             check_pass "Disk encryption (LUKS/dm-crypt) detected"
         else
             check_warn "No disk encryption detected - verify at cloud provider level"
@@ -328,8 +336,12 @@ check_users() {
     # Check for required users
     if id "svcops" &>/dev/null; then
         check_pass "User 'svcops' exists"
-        
-        if groups svcops | grep -q "sudo"; then
+
+        set +e  # Temporarily allow grep to fail without exiting
+        groups svcops | grep -q "sudo" 2>/dev/null
+        local has_sudo=$?
+        set -e
+        if [[ $has_sudo -eq 0 ]]; then
             check_pass "User 'svcops' has sudo access"
         else
             check_warn "User 'svcops' does not have sudo access"
@@ -422,7 +434,11 @@ check_users() {
     for user in root svcops forge; do
         if id "$user" &>/dev/null; then
             local last_login=$(lastlog -u "$user" 2>/dev/null | tail -1)
-            if echo "$last_login" | grep -q "Never logged in"; then
+            set +e  # Temporarily allow grep to fail without exiting
+            echo "$last_login" | grep -q "Never logged in" 2>/dev/null
+            local never_logged_in=$?
+            set -e
+            if [[ $never_logged_in -eq 0 ]]; then
                 check_info "  $user: Never logged in"
             else
                 local login_info=$(last -1 "$user" 2>/dev/null | head -1)
@@ -530,8 +546,12 @@ check_services() {
     
     for service in "${!services[@]}"; do
         local desc="${services[$service]}"
-        
-        if systemctl list-unit-files | grep -q "^${service}"; then
+
+        set +e  # Temporarily allow grep to fail without exiting
+        systemctl list-unit-files | grep -q "^${service}" 2>/dev/null
+        local service_exists=$?
+        set -e
+        if [[ $service_exists -eq 0 ]]; then
             if systemctl is-active --quiet "$service"; then
                 check_pass "$desc ($service): Running"
             else

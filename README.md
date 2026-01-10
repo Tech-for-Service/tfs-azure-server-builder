@@ -53,6 +53,7 @@ tfs-azure-server-builder/
 │   ├── setup.sh              # One-time hardening
 │   └── verify.sh             # Weekly verification
 ├── docs/
+│   ├── POST-SETUP.md         # First VM setup guide
 │   ├── ARCHITECTURE.md       # System design details
 │   └── SCRIPTS.md            # Hardening script reference
 └── CLAUDE.md                  # AI assistant context
@@ -108,8 +109,16 @@ After VM deployment:
 1. Copy public IP from builder output
 2. In Forge: Servers → Create Server → Custom VPS
 3. Enter IP, username (default: `svcops`), port 22
-4. Run Forge's provisioning command on the server
-5. After Forge completes, SSH in and run:
+4. SSH into the server and prepare for Forge provisioning:
+   ```bash
+   # Switch to root with interactive shell
+   sudo -i
+
+   # Change to /tmp directory
+   cd /tmp
+   ```
+5. Run Forge's provisioning command (shown in Forge UI)
+6. After Forge completes, SSH in and run:
    ```bash
    sudo /etc/tfs/hardening/setup.sh
    ```
@@ -142,6 +151,7 @@ az storage account list --query "[?tags.TFSManaged].name" -o tsv
 
 ## Documentation
 
+- [Post-Setup Guide](docs/POST-SETUP.md) - Step-by-step verification checklist for your first VM
 - [Architecture](docs/ARCHITECTURE.md) - System design and decisions
 - [Scripts Reference](docs/SCRIPTS.md) - Hardening script details
 

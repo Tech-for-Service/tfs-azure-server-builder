@@ -222,9 +222,9 @@ check_ssh() {
     }
     
     check_info "Verifying SSH configuration..."
-    
+
     # Check if SSH service is running
-    if systemctl is-active --quiet sshd; then
+    if systemctl is-active --quiet ssh; then
         check_pass "SSH service running"
     else
         check_fail "SSH service not running"

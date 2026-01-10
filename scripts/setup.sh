@@ -189,7 +189,7 @@ EOF
     
     # Test config before reloading
     if sshd -t 2>/dev/null; then
-        systemctl reload sshd
+        systemctl reload ssh
         success "SSH hardening applied"
     else
         error "SSH config test failed - check $SSH_HARDENING_FILE"

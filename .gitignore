@@ -1,0 +1,34 @@
+# User-specific configuration
+config.json
+config/settings.yaml
+
+# SSH keys
+ssh/
+*.pem
+*.pub
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+
+# Azure CLI
+.azure/

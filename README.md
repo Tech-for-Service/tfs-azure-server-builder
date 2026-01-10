@@ -43,10 +43,11 @@ python azure-server-builder.py
 ```
 tfs-azure-server-builder/
 ├── azure-server-builder.py         # Main builder script (Python)
+├── builder.bat                     # Windows launcher (deployment)
+├── builder-dry-run.bat             # Windows launcher (preview mode)
 ├── config/
 │   ├── settings.yaml               # Your configuration (gitignored)
 │   └── settings.yaml.example       # Template configuration (YAML)
-├── run.bat                         # Windows launcher
 ├── ssh/                            # Generated SSH keys (gitignored)
 ├── scripts/                        # Server-side scripts (Bash)
 │   ├── setup.sh              # One-time hardening

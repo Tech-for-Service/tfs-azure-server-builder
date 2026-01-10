@@ -549,10 +549,12 @@ check_services() {
     for service in "${!services[@]}"; do
         local desc="${services[$service]}"
 
-        set +e  # Temporarily allow grep to fail without exiting
-        systemctl list-unit-files | grep -q "^${service}" 2>/dev/null
+        # Check if service unit exists (returns 0 if exists, 1 if not)
+        set +e
+        systemctl cat "$service" &>/dev/null
         local service_exists=$?
         set -e
+
         if [[ $service_exists -eq 0 ]]; then
             if systemctl is-active --quiet "$service"; then
                 check_pass "$desc ($service): Running"

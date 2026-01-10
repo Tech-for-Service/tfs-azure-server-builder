@@ -374,14 +374,29 @@ check_users() {
     # Users with NOPASSWD sudo
     log ""
     check_info "Users with NOPASSWD sudo:"
-    local nopasswd_found=false
+    local forge_count=0
+    local other_found=false
+
     while IFS= read -r line; do
         if [[ -n "$line" && ! "$line" =~ ^# ]]; then
-            check_warn "  $line"
-            nopasswd_found=true
+            # Check if this is a forge user entry
+            if [[ "$line" =~ forge[[:space:]]ALL ]]; then
+                ((forge_count++)) || true
+            else
+                # Non-forge NOPASSWD entry - this is a security concern
+                check_warn "  $line"
+                other_found=true
+            fi
         fi
     done < <(grep -r "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null | grep -v "^#")
-    if [[ "$nopasswd_found" == "false" ]]; then
+
+    # Report forge entries as a single INFO line
+    if [[ $forge_count -gt 0 ]]; then
+        check_info "  forge user has $forge_count NOPASSWD sudo rule(s) (required for Laravel Forge functionality)"
+    fi
+
+    # If no NOPASSWD entries at all, that's ideal
+    if [[ "$other_found" == "false" && $forge_count -eq 0 ]]; then
         check_pass "  No NOPASSWD sudo entries found"
     fi
     
@@ -574,7 +589,8 @@ check_services() {
 print_summary() {
     section_header "SUMMARY"
 
-    local total=$((PASS_COUNT + FAIL_COUNT + WARN_COUNT))
+    # Compliance score based only on PASS/FAIL (warnings are informational)
+    local total=$((PASS_COUNT + FAIL_COUNT))
     local score=0
     if [[ $total -gt 0 ]]; then
         score=$(( (PASS_COUNT * 100) / total ))
@@ -584,9 +600,9 @@ print_summary() {
     log "|--------|-------|"
     log "| ${GREEN}✅ Passed${NC} | $PASS_COUNT |"
     log "| ${RED}❌ Failed${NC} | $FAIL_COUNT |"
-    log "| ${YELLOW}⚠️ Warnings${NC} | $WARN_COUNT |"
+    log "| ${YELLOW}⚠️ Warnings${NC} | $WARN_COUNT (informational, does not affect score) |"
     log ""
-    log "**Compliance Score:** ${BOLD}$score%${NC}"
+    log "**Compliance Score:** ${BOLD}$score%${NC} (based on $PASS_COUNT passed / $total checks)"
     log ""
 
     if [[ $score -ge 90 ]]; then

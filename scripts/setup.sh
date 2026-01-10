@@ -215,9 +215,32 @@ apply_ufw() {
     ufw default deny incoming
     ufw default allow outgoing
     
-    # Allow configured ports
+    # Allow configured ports (add comment to existing rules if needed)
     for port in $UFW_ALLOWED_PORTS; do
-        ufw allow "${port}/tcp" comment "Hardening"
+        # Check if rule exists with our comment
+        if ufw status | grep -q "${port}/tcp.*Hardening"; then
+            info "UFW rule for port ${port} already has Hardening comment, skipping"
+        # Check if rule exists without our comment
+        elif ufw status | grep -q "^${port}/tcp.*ALLOW" || ufw status | grep -q "^${port}[[:space:]].*ALLOW"; then
+            info "Updating UFW rule for port ${port} with Hardening comment"
+            # Delete existing rule(s) for this port
+            while ufw status numbered | grep -q "${port}/tcp\|${port}[[:space:]]"; do
+                # Find the rule number
+                local rule_num=$(ufw status numbered | grep "${port}/tcp\|${port}[[:space:]]" | head -1 | grep -o '^\[[[:space:]]*[0-9]*\]' | tr -d '[][:space:]')
+                if [[ -n "$rule_num" ]]; then
+                    echo "y" | ufw delete "$rule_num" >/dev/null 2>&1
+                else
+                    break
+                fi
+            done
+            # Re-add with comment
+            ufw allow "${port}/tcp" comment "Hardening"
+            info "Updated UFW rule: ${port}/tcp"
+        else
+            # Rule doesn't exist, add it
+            ufw allow "${port}/tcp" comment "Hardening"
+            info "Added UFW rule: ${port}/tcp"
+        fi
     done
     
     # Enable UFW (non-interactive)

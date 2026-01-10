@@ -57,17 +57,17 @@ log() {
 }
 
 check_pass() {
-    ((PASS_COUNT++))
+    ((PASS_COUNT++)) || true
     log "${GREEN}✅ PASS:${NC} $1"
 }
 
 check_fail() {
-    ((FAIL_COUNT++))
+    ((FAIL_COUNT++)) || true
     log "${RED}❌ FAIL:${NC} $1"
 }
 
 check_warn() {
-    ((WARN_COUNT++))
+    ((WARN_COUNT++)) || true
     log "${YELLOW}⚠️ WARN:${NC} $1"
 }
 

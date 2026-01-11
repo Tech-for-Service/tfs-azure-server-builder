@@ -1,0 +1,32 @@
+# Azure Authentication
+azure-identity>=1.15.0,<2.0.0
+
+# Azure Management SDKs
+azure-mgmt-resource>=23.0.0,<24.0.0
+azure-mgmt-compute>=30.0.0,<31.0.0
+azure-mgmt-network>=25.0.0,<26.0.0
+azure-mgmt-subscription>=3.1.0,<4.0.0
+azure-mgmt-monitor>=6.0.0,<7.0.0
+azure-mgmt-keyvault>=10.0.0,<11.0.0
+azure-mgmt-storage>=21.0.0,<22.0.0
+azure-mgmt-authorization>=4.0.0,<5.0.0
+
+# Azure Key Vault and Storage
+azure-keyvault-secrets>=4.7.0,<5.0.0
+azure-storage-blob>=12.19.0,<13.0.0
+
+# HTTP Requests
+requests>=2.31.0,<3.0.0
+
+# Configuration (YAML parsing)
+PyYAML>=6.0,<7.0.0
+
+# CLI Progress and Formatting
+rich>=13.0.0,<14.0.0
+
+# Cryptography (for SSH key generation fallback)
+cryptography>=41.0.0,<43.0.0
+
+# Windows-specific (optional, for secure file permissions)
+# Install on Windows with: pip install pywin32
+# pywin32>=305; sys_platform == 'win32'

@@ -152,6 +152,7 @@ az storage account list --query "[?tags.TFSManaged].name" -o tsv
 ## Documentation
 
 - [Post-Setup Guide](docs/POST-SETUP.md) - Step-by-step verification checklist for your first VM
+- [Maintenance Guide](docs/MAINTENANCE.md) - Server maintenance, updates, compliance checks, and Key Vault access
 - [Architecture](docs/ARCHITECTURE.md) - System design and decisions
 - [Scripts Reference](docs/SCRIPTS.md) - Hardening script details
 

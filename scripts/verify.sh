@@ -166,18 +166,7 @@ check_encryption() {
         
         # Server-Side Encryption (always on for Azure managed disks)
         check_pass "Server-Side Encryption (SSE): Enabled by default on all managed disks"
-        
-        # Check for Azure Disk Encryption (ADE) - additional OS-level encryption
-        set +e  # Temporarily allow grep to fail without exiting
-        lsblk | grep -q "crypt" 2>/dev/null
-        local crypt_found=$?
-        set -e
-        if [[ $crypt_found -eq 0 ]]; then
-            check_pass "Azure Disk Encryption (ADE): Enabled (dm-crypt layer active)"
-        else
-            check_info "Azure Disk Encryption (ADE): Not enabled (optional additional layer)"
-        fi
-        
+
         # Trusted Launch / Security Profile
         log ""
         check_info "Security Profile:"
@@ -195,16 +184,7 @@ check_encryption() {
             check_warn "  Virtual TPM: Not enabled"
         fi
     else
-        check_info "Not running on Azure (or IMDS unavailable)"
-        set +e  # Temporarily allow grep to fail without exiting
-        lsblk | grep -q "crypt" 2>/dev/null
-        local crypt_found=$?
-        set -e
-        if [[ $crypt_found -eq 0 ]]; then
-            check_pass "Disk encryption (LUKS/dm-crypt) detected"
-        else
-            check_warn "No disk encryption detected - verify at cloud provider level"
-        fi
+        check_info "Not running on Azure (or IMDS unavailable) - verify encryption at cloud provider level"
     fi
 }
 
@@ -600,7 +580,7 @@ print_summary() {
     log "|--------|-------|"
     log "| ${GREEN}✅ Passed${NC} | $PASS_COUNT |"
     log "| ${RED}❌ Failed${NC} | $FAIL_COUNT |"
-    log "| ${YELLOW}⚠️ Warnings${NC} | $WARN_COUNT (informational, does not affect score) |"
+    log "| ${YELLOW}⚠️ Warnings${NC} | $WARN_COUNT |"
     log ""
     log "**Compliance Score:** ${BOLD}$score%${NC} (based on $PASS_COUNT passed / $total checks)"
     log ""

@@ -1,0 +1,434 @@
+{
+  "_metadata": {
+    "description": "Azure regions with display names and locations",
+    "last_updated": "2025-12-18",
+    "data_source": "Azure API with manual review",
+    "default": "southcentralus"
+  },
+  "regions": [
+    {
+      "enabled": false,
+      "country": "US",
+      "name": "centralus",
+      "display_name": "Central US",
+      "location": "Iowa",
+      "tfs_code": "usc1"
+    },
+    {
+      "enabled": true,
+      "country": "US",
+      "name": "eastus",
+      "display_name": "East US",
+      "location": "Virginia",
+      "tfs_code": "eus1"
+    },
+    {
+      "enabled": false,
+      "country": "US",
+      "name": "eastus2",
+      "display_name": "East US 2",
+      "location": "Virginia",
+      "tfs_code": "eus2"
+    },
+    {
+      "enabled": true,
+      "country": "US",
+      "name": "northcentralus",
+      "display_name": "North Central US",
+      "location": "Illinois",
+      "tfs_code": "ncu1"
+    },
+    {
+      "enabled": true,
+      "country": "US",
+      "name": "southcentralus",
+      "display_name": "South Central US",
+      "location": "Texas",
+      "tfs_code": "scu1"
+    },
+    {
+      "enabled": true,
+      "country": "US",
+      "name": "westcentralus",
+      "display_name": "West Central US",
+      "location": "Wyoming",
+      "tfs_code": "wcu1"
+    },
+    {
+      "enabled": true,
+      "country": "US",
+      "name": "westus",
+      "display_name": "West US",
+      "location": "California",
+      "tfs_code": "wus1"
+    },
+    {
+      "enabled": true,
+      "country": "US",
+      "name": "westus2",
+      "display_name": "West US 2",
+      "location": "Washington",
+      "tfs_code": "wus2"
+    },
+    {
+      "enabled": false,
+      "country": "US",
+      "name": "westus3",
+      "display_name": "West US 3",
+      "location": "Arizona",
+      "tfs_code": "wus3"
+    },
+    {
+      "enabled": false,
+      "country": "AU",
+      "name": "australiacentral",
+      "display_name": "Australia Central",
+      "location": "Canberra",
+      "tfs_code": "auc1"
+    },
+    {
+      "enabled": false,
+      "country": "AU",
+      "name": "australiacentral2",
+      "display_name": "Australia Central 2",
+      "location": "Canberra",
+      "tfs_code": "auc2"
+    },
+    {
+      "enabled": false,
+      "country": "AU",
+      "name": "australiaeast",
+      "display_name": "Australia East",
+      "location": "New South Wales",
+      "tfs_code": "aue1"
+    },
+    {
+      "enabled": false,
+      "country": "AU",
+      "name": "australiasoutheast",
+      "display_name": "Australia Southeast",
+      "location": "Victoria",
+      "tfs_code": "vic1"
+    },
+    {
+      "enabled": false,
+      "country": "AT",
+      "name": "austriaeast",
+      "display_name": "Austria East",
+      "location": "Vienna",
+      "tfs_code": "ate1"
+    },
+    {
+      "enabled": false,
+      "country": "BE",
+      "name": "belgiumcentral",
+      "display_name": "Belgium Central",
+      "location": "Brussels",
+      "tfs_code": "bec1"
+    },
+    {
+      "enabled": false,
+      "country": "BR",
+      "name": "brazilsouth",
+      "display_name": "Brazil South",
+      "location": "Sao Paulo",
+      "tfs_code": "brs1"
+    },
+    {
+      "enabled": false,
+      "country": "BR",
+      "name": "brazilsoutheast",
+      "display_name": "Brazil Southeast",
+      "location": "Rio de Janeiro",
+      "tfs_code": "bse1"
+    },
+    {
+      "enabled": false,
+      "country": "CA",
+      "name": "canadacentral",
+      "display_name": "Canada Central",
+      "location": "Toronto",
+      "tfs_code": "cac1"
+    },
+    {
+      "enabled": false,
+      "country": "CA",
+      "name": "canadaeast",
+      "display_name": "Canada East",
+      "location": "Quebec City",
+      "tfs_code": "cae1"
+    },
+    {
+      "enabled": false,
+      "country": "IN",
+      "name": "centralindia",
+      "display_name": "Central India",
+      "location": "Pune",
+      "tfs_code": "inc1"
+    },
+    {
+      "enabled": false,
+      "country": "CL",
+      "name": "chilecentral",
+      "display_name": "Chile Central",
+      "location": "Santiago",
+      "tfs_code": "chl1"
+    },
+    {
+      "enabled": false,
+      "country": "FR",
+      "name": "francecentral",
+      "display_name": "France Central",
+      "location": "Paris",
+      "tfs_code": "frc1"
+    },
+    {
+      "enabled": false,
+      "country": "FR",
+      "name": "francesouth",
+      "display_name": "France South",
+      "location": "Marseille",
+      "tfs_code": "frs1"
+    },
+    {
+      "enabled": false,
+      "country": "DE",
+      "name": "germanynorth",
+      "display_name": "Germany North",
+      "location": "Berlin",
+      "tfs_code": "ber1"
+    },
+    {
+      "enabled": false,
+      "country": "DE",
+      "name": "germanywestcentral",
+      "display_name": "Germany West Central",
+      "location": "Frankfurt",
+      "tfs_code": "frk1"
+    },
+    {
+      "enabled": false,
+      "country": "ID",
+      "name": "indonesiacentral",
+      "display_name": "Indonesia Central",
+      "location": "Jakarta",
+      "tfs_code": "jak1"
+    },
+    {
+      "enabled": false,
+      "country": "IL",
+      "name": "israelcentral",
+      "display_name": "Israel Central",
+      "location": "Tel Aviv",
+      "tfs_code": "isc1"
+    },
+    {
+      "enabled": false,
+      "country": "IT",
+      "name": "italynorth",
+      "display_name": "Italy North",
+      "location": "Milan",
+      "tfs_code": "itn1"
+    },
+    {
+      "enabled": false,
+      "country": "JP",
+      "name": "japaneast",
+      "display_name": "Japan East",
+      "location": "Tokyo",
+      "tfs_code": "jpe1"
+    },
+    {
+      "enabled": false,
+      "country": "JP",
+      "name": "japanwest",
+      "display_name": "Japan West",
+      "location": "Osaka",
+      "tfs_code": "jpw1"
+    },
+    {
+      "enabled": false,
+      "country": "IN",
+      "name": "jioindiacentral",
+      "display_name": "Jio India Central",
+      "location": "Nagpur",
+      "tfs_code": "nag2"
+    },
+    {
+      "enabled": false,
+      "country": "IN",
+      "name": "jioindiawest",
+      "display_name": "Jio India West",
+      "location": "Jamnagar",
+      "tfs_code": "jam1"
+    },
+    {
+      "enabled": false,
+      "country": "KR",
+      "name": "koreacentral",
+      "display_name": "Korea Central",
+      "location": "Seoul",
+      "tfs_code": "krc1"
+    },
+    {
+      "enabled": false,
+      "country": "KR",
+      "name": "koreasouth",
+      "display_name": "Korea South",
+      "location": "Busan",
+      "tfs_code": "krs1"
+    },
+    {
+      "enabled": false,
+      "country": "MY",
+      "name": "malaysiawest",
+      "display_name": "Malaysia West",
+      "location": "Kuala Lumpur",
+      "tfs_code": "kua1"
+    },
+    {
+      "enabled": false,
+      "country": "MX",
+      "name": "mexicocentral",
+      "display_name": "Mexico Central",
+      "location": "Queretaro",
+      "tfs_code": "mxc1"
+    },
+    {
+      "enabled": false,
+      "country": "NZ",
+      "name": "newzealandnorth",
+      "display_name": "New Zealand North",
+      "location": "Auckland",
+      "tfs_code": "nzn1"
+    },
+    {
+      "enabled": false,
+      "country": "IE",
+      "name": "northeurope",
+      "display_name": "North Europe",
+      "location": "Ireland",
+      "tfs_code": "neu1"
+    },
+    {
+      "enabled": false,
+      "country": "NO",
+      "name": "norwayeast",
+      "display_name": "Norway East",
+      "location": "Oslo",
+      "tfs_code": "noe1"
+    },
+    {
+      "enabled": false,
+      "country": "NO",
+      "name": "norwaywest",
+      "display_name": "Norway West",
+      "location": "Stavanger",
+      "tfs_code": "now1"
+    },
+    {
+      "enabled": false,
+      "country": "PL",
+      "name": "polandcentral",
+      "display_name": "Poland Central",
+      "location": "Warsaw",
+      "tfs_code": "plc1"
+    },
+    {
+      "enabled": false,
+      "country": "ZA",
+      "name": "southafricanorth",
+      "display_name": "South Africa North",
+      "location": "Johannesburg",
+      "tfs_code": "zan1"
+    },
+    {
+      "enabled": false,
+      "country": "ZA",
+      "name": "southafricawest",
+      "display_name": "South Africa West",
+      "location": "Cape Town",
+      "tfs_code": "cpt1"
+    },
+    {
+      "enabled": false,
+      "country": "SG",
+      "name": "southeastasia",
+      "display_name": "Southeast Asia",
+      "location": "Singapore",
+      "tfs_code": "sgp1"
+    },
+    {
+      "enabled": false,
+      "country": "IN",
+      "name": "southindia",
+      "display_name": "South India",
+      "location": "Chennai",
+      "tfs_code": "ins1"
+    },
+    {
+      "enabled": false,
+      "country": "ES",
+      "name": "spaincentral",
+      "display_name": "Spain Central",
+      "location": "Madrid",
+      "tfs_code": "spc1"
+    },
+    {
+      "enabled": false,
+      "country": "SE",
+      "name": "swedencentral",
+      "display_name": "Sweden Central",
+      "location": "Gavle",
+      "tfs_code": "swc1"
+    },
+    {
+      "enabled": false,
+      "country": "CH",
+      "name": "switzerlandnorth",
+      "display_name": "Switzerland North",
+      "location": "Zurich",
+      "tfs_code": "szn1"
+    },
+    {
+      "enabled": false,
+      "country": "CH",
+      "name": "switzerlandwest",
+      "display_name": "Switzerland West",
+      "location": "Geneva",
+      "tfs_code": "szw1"
+    },
+    {
+      "enabled": false,
+      "country": "GB",
+      "name": "uksouth",
+      "display_name": "UK South",
+      "location": "London",
+      "tfs_code": "uks1"
+    },
+    {
+      "enabled": false,
+      "country": "GB",
+      "name": "ukwest",
+      "display_name": "UK West",
+      "location": "Cardiff",
+      "tfs_code": "ukw1"
+    },
+    {
+      "enabled": false,
+      "country": "NL",
+      "name": "westeurope",
+      "display_name": "West Europe",
+      "location": "Netherlands",
+      "tfs_code": "weu1"
+    },
+    {
+      "enabled": false,
+      "country": "IN",
+      "name": "westindia",
+      "display_name": "West India",
+      "location": "Mumbai",
+      "tfs_code": "inw1"
+    }
+  ]
+}

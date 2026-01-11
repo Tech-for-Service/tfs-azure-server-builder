@@ -1,0 +1,38 @@
+{
+  "_metadata": {
+    "description": "Azure Virtual Machine SKUs (sizes) with specifications and pricing",
+    "last_updated": "2026-01-10",
+    "data_source": "Azure Retail Prices API (South Central US, Linux, Standard on-demand)",
+    "notes": "Pricing rounded up to nearest $5. Costs are monthly estimates (hourly rate × 730 hours). Pricing may vary by region."
+  },
+  "vm_sizes": [
+    {
+      "code": "Standard_B2als_v2",
+      "vcpu": 2,
+      "ram_gb": 4,
+      "cost_month_usd": 35.00,
+      "description": "~$35/mo - AMD, 2 vCPU, 4 GB RAM (Burstable with local disk)"
+    },
+    {
+      "code": "Standard_B2ls_v2",
+      "vcpu": 2,
+      "ram_gb": 4,
+      "cost_month_usd": 40.00,
+      "description": "~$40/mo - Intel, 2 vCPU, 4 GB RAM (Burstable with local disk)"
+    },
+    {
+      "code": "Standard_B2as_v2",
+      "vcpu": 2,
+      "ram_gb": 4,
+      "cost_month_usd": 70.00,
+      "description": "~$70/mo - AMD, 2 vCPU, 4 GB RAM (Burstable)"
+    },
+    {
+      "code": "Standard_B2s_v2",
+      "vcpu": 2,
+      "ram_gb": 8,
+      "cost_month_usd": 75.00,
+      "description": "~$75/mo - Intel, 2 vCPU, 8 GB RAM (Burstable)"
+    }
+  ]
+}

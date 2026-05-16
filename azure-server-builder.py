@@ -898,10 +898,20 @@ class DeploymentLog:
             return None
 
     def upload_to_blob(self, storage_account_name: str, server_name: str,
-                       credential, subscription_id: str) -> bool:
+                       credential, subscription_id: str, storage_account_id: str = None) -> bool:
         """Upload deployment log to Azure Blob Storage"""
         try:
             from azure.storage.blob import BlobServiceClient
+
+            # The signed-in builder user needs Azure Storage data-plane permissions.
+            # Owner/Contributor on the storage account is not enough for blob upload
+            # when authenticating with Microsoft Entra ID. Verify access here because
+            # role assignments can take time to propagate.
+            if storage_account_id:
+                if not ensure_current_user_storage_write_access(
+                    credential, subscription_id, storage_account_id, storage_account_name
+                ):
+                    return False
 
             # Build blob service client
             account_url = f"https://{storage_account_name}.blob.core.windows.net"
@@ -2244,6 +2254,129 @@ KEY_VAULT_SECRETS_OFFICER_ROLE = "b86a8fe4-44ce-4948-aee5-eccb2c155cd7"
 TFS_MANAGED_TAG = "TFSManaged"
 
 
+@retry_with_backoff(max_retries=4, base_delay=5, max_delay=90)
+def assign_storage_role_to_current_user(credential, subscription_id: str, storage_account_id: str) -> bool:
+    """Assign Storage Blob Data Contributor to the signed-in builder principal.
+
+    This grants the local builder user data-plane write access so deployment logs
+    can be uploaded to Blob Storage. This is separate from the VM managed identity
+    role assignment used later by setup.sh and verify.sh.
+    """
+    import uuid
+
+    principal_id = get_current_user_object_id(credential)
+    if not principal_id:
+        print_warning("Could not determine current signed-in principal - skipping local storage role assignment")
+        print_info("Deployment log upload may fail unless your user already has Storage Blob Data Contributor")
+        return False
+
+    auth_client = AuthorizationManagementClient(credential, subscription_id)
+    role_definition_id = f"/subscriptions/{subscription_id}/providers/Microsoft.Authorization/roleDefinitions/{STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE}"
+
+    try:
+        print("Ensuring current user has Storage Blob Data Contributor...", end=" ", flush=True)
+        auth_client.role_assignments.create(
+            scope=storage_account_id,
+            role_assignment_name=str(uuid.uuid4()),
+            parameters={
+                "role_definition_id": role_definition_id,
+                "principal_id": principal_id
+            }
+        )
+        print_success("Role assignment submitted")
+        return True
+    except Exception as e:
+        if "RoleAssignmentExists" in str(e):
+            print_success("Current user already has Storage Blob Data Contributor role")
+            return True
+
+        print_warning(f"Could not assign Storage Blob Data Contributor to current user: {e}")
+        print_info("Deployment can continue, but deployment log upload may fail until this role is granted")
+        print_storage_role_manual_fix(principal_id, storage_account_id)
+        return False
+
+
+def print_storage_role_manual_fix(principal_id: str, storage_account_id: str) -> None:
+    """Print the manual command needed to grant local blob upload access."""
+    print_info("Manual fix:")
+    print_info('  az role assignment create --role "Storage Blob Data Contributor" \\')
+    print_info(f"    --assignee-object-id {principal_id} --scope {storage_account_id}")
+
+
+def test_storage_blob_write_access(credential, storage_account_name: str) -> bool:
+    """Return True if the current credential can write and delete a test blob."""
+    import uuid
+    from azure.storage.blob import BlobServiceClient
+
+    account_url = f"https://{storage_account_name}.blob.core.windows.net"
+    blob_service = BlobServiceClient(account_url=account_url, credential=credential)
+    container_client = blob_service.get_container_client(HARDENING_REPORTS_CONTAINER)
+
+    if not container_client.exists():
+        blob_service.create_container(HARDENING_REPORTS_CONTAINER)
+
+    blob_name = f".access-test/{uuid.uuid4()}.txt"
+    blob_client = container_client.get_blob_client(blob_name)
+    blob_client.upload_blob("storage access test", overwrite=True)
+    blob_client.delete_blob()
+    return True
+
+
+def wait_for_storage_blob_write_access(credential, storage_account_name: str, timeout_seconds: int = 240, interval_seconds: int = 15) -> bool:
+    """Wait for Storage Blob Data Contributor to propagate to blob data-plane access."""
+    import time
+
+    deadline = time.time() + timeout_seconds
+    attempt = 1
+    last_error = None
+
+    while time.time() < deadline:
+        try:
+            if test_storage_blob_write_access(credential, storage_account_name):
+                print_success("Verified blob write access for current user")
+                return True
+        except Exception as e:
+            last_error = e
+            remaining = int(deadline - time.time())
+            if remaining <= 0:
+                break
+            print_info(f"Waiting for blob role propagation ({remaining}s remaining, attempt {attempt})...")
+            time.sleep(interval_seconds)
+            attempt += 1
+
+    if last_error:
+        print_warning(f"Blob write access was not available after waiting: {last_error}")
+    else:
+        print_warning("Blob write access was not available after waiting")
+    return False
+
+
+def ensure_current_user_storage_write_access(credential, subscription_id: str, storage_account_id: str, storage_account_name: str) -> bool:
+    """Assign the local user blob write role if possible, then verify actual data-plane write access."""
+    principal_id = get_current_user_object_id(credential)
+
+    # Try current access first. This avoids unnecessary role assignment calls.
+    try:
+        if test_storage_blob_write_access(credential, storage_account_name):
+            print_success("Current user already has blob write access")
+            return True
+    except Exception:
+        pass
+
+    role_attempted = assign_storage_role_to_current_user(credential, subscription_id, storage_account_id)
+
+    if wait_for_storage_blob_write_access(credential, storage_account_name):
+        return True
+
+    print_warning("Current user still does not have verified blob write access")
+    if principal_id:
+        print_storage_role_manual_fix(principal_id, storage_account_id)
+    if role_attempted:
+        print_info("If the role was just assigned, Azure RBAC propagation may need a few more minutes.")
+        print_info("Rerun the builder or re-upload the saved local deployment log after propagation completes.")
+    return False
+
+
 def generate_storage_account_name(scope: str) -> str:
     """Generate globally unique storage account name: tfs{21 random chars}
 
@@ -2406,6 +2539,11 @@ def create_reports_storage(credential, subscription_id: str, scope: str, locatio
 
     storage_id = f"/subscriptions/{subscription_id}/resourceGroups/{SHARED_RG_NAME}/providers/Microsoft.Storage/storageAccounts/{storage_name}"
 
+    # Give the signed-in builder user verified data-plane access so container creation and
+    # deployment-log upload can work with Microsoft Entra authentication.
+    ensure_current_user_storage_write_access(credential, subscription_id, storage_id, storage_name)
+    ensure_containers_exist(credential, storage_name)
+
     return {
         'name': storage_name,
         'id': storage_id,
@@ -2462,7 +2600,9 @@ def setup_verification_storage(credential, subscription_id: str, scope: str, loc
 
     if existing:
         print_success(f"Found existing storage for scope '{scope}': {existing['name']}")
-        # Ensure both containers exist (in case storage predates dual-container setup)
+        # Ensure the signed-in builder user has verified blob data-plane write access for deployment-log upload.
+        ensure_current_user_storage_write_access(credential, subscription_id, existing['id'], existing['name'])
+        # Ensure both containers exist (in case storage predates dual-container setup).
         ensure_containers_exist(credential, existing['name'])
         return existing
 
@@ -3896,6 +4036,7 @@ def save_deployment_artifacts(
     deploy_log: 'DeploymentLog',
     server_name: str,
     storage_account_name: str,
+    storage_account_id: str,
     credential: Any,
     subscription_id: str
 ) -> bool:
@@ -3911,7 +4052,7 @@ def save_deployment_artifacts(
 
     # Upload to Azure Blob
     print("Uploading deployment log to Azure Blob...", end=" ", flush=True)
-    if deploy_log.upload_to_blob(storage_account_name, server_name, credential, subscription_id):
+    if deploy_log.upload_to_blob(storage_account_name, server_name, credential, subscription_id, storage_account_id):
         print_success("Done")
         print_info(f"Blob location: {HARDENING_REPORTS_CONTAINER}/{server_name}/deployment-{server_name}-*.md")
         print()
@@ -4265,6 +4406,7 @@ def main():
             deploy_log,
             server_config.server_name,
             deployment_result.storage_info['name'],
+            deployment_result.storage_info['id'],
             azure_env.credential,
             azure_env.subscription_id
         )

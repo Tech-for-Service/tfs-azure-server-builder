@@ -103,7 +103,7 @@ contains_space_list_item() {
 normalize_fail2ban_ignoreip() {
     local ip="$1"
 
-    # Fail2ban normalizes 127.0.0.1/8 to the actual network 127.0.0.0/8.
+    # Fail2ban normalizes 127.0.0.1/8 to the actual loopback network.
     if [[ "$ip" == "127.0.0.1/8" ]]; then
         echo "127.0.0.0/8"
     else
@@ -151,13 +151,14 @@ load_config() {
     FORGE_IPS="${FORGE_IPS:-159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124}"
 
     if [[ "${ENABLE_FORGE_INTEGRATION}" == "true" ]]; then
-        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER} forge}"
+        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-root ${SSH_ADMIN_USER} forge}"
+        SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-prohibit-password}"
     else
         SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER}}"
+        SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-no}"
     fi
 
-    SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-no}"
-    ENABLE_FORGE_ROOT_MATCH="${ENABLE_FORGE_ROOT_MATCH:-${ENABLE_FORGE_INTEGRATION}}"
+    ENABLE_FORGE_ROOT_MATCH="${ENABLE_FORGE_ROOT_MATCH:-false}"
     FORGE_ROOT_PERMIT_LOGIN="${FORGE_ROOT_PERMIT_LOGIN:-prohibit-password}"
     FORGE_MATCH_ALLOWED_USERS="${FORGE_MATCH_ALLOWED_USERS:-root ${SSH_ALLOWED_USERS}}"
 
@@ -334,9 +335,17 @@ check_ssh() {
         fi
 
         if echo "$allowusers" | grep -qw "root"; then
-            check_warn "Global SSH AllowUsers includes root"
+            if [[ "$SSH_PERMIT_ROOT_LOGIN" == "prohibit-password" && "$ENABLE_FORGE_INTEGRATION" == "true" ]]; then
+                check_pass "Global SSH AllowUsers includes root for Forge key-only access"
+            else
+                check_warn "Global SSH AllowUsers includes root"
+            fi
         else
-            check_pass "Global SSH AllowUsers does not include root"
+            if [[ "$SSH_PERMIT_ROOT_LOGIN" == "prohibit-password" && "$ENABLE_FORGE_INTEGRATION" == "true" ]]; then
+                check_fail "Forge integration expects root in global SSH AllowUsers"
+            else
+                check_pass "Global SSH AllowUsers does not include root"
+            fi
         fi
     else
         check_warn "SSH AllowUsers is not configured"
@@ -470,9 +479,7 @@ check_fail2ban() {
             check_info "SSH jail ignoreip: $configured_ignoreip"
 
             for ip in $FAIL2BAN_IGNOREIP; do
-                local normalized_ip
                 normalized_ip="$(normalize_fail2ban_ignoreip "$ip")"
-
                 if contains_space_list_item "$normalized_ip" "$configured_ignoreip"; then
                     check_pass "Fail2ban ignoreip includes $ip"
                 else
@@ -735,8 +742,8 @@ check_php_fpm_services() {
 
     while IFS= read -r service; do
         [[ -z "$service" ]] && continue
-        found=true
         service="${service%.service}"
+        found=true
 
         if systemctl is-active --quiet "$service"; then
             check_pass "PHP-FPM ($service): Running"

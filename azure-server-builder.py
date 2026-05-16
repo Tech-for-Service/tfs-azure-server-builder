@@ -91,8 +91,8 @@ VERSION = "1.2.1"
 #   sha256sum scripts/setup.sh scripts/verify.sh
 # Then update these values and commit everything together
 SCRIPT_CHECKSUMS = {
-    'setup.sh': 'c4a69597bcdd5dbbd4116aef06b02243adce9605c329fb7155c7587a7563d099',
-    'verify.sh': 'ab5ebfdde0262b9e64a798e53a11b1e4a10508edc424bfd9396701b13dead0ea'
+    'setup.sh': 'd845479297495f0b5c88a7e2554408f6d441cc9d4fe87310304a0a985e225743',
+    'verify.sh': '09d8b7b79202f064a6d2337afb43bc78dc22a6e081b4fd4376a8d51b7af35af6'
 }
 
 # =============================================================================
@@ -2630,15 +2630,19 @@ TFS_SUBSCRIPTION_ID="{subscription_id}"
 # This ensures the Azure VM admin user selected during provisioning remains SSH-allowed
 # after /etc/tfs/hardening/setup.sh writes /etc/ssh/sshd_config.d/99-hardening.conf.
 SSH_ADMIN_USER="{admin_username}"
-SSH_ALLOWED_USERS="{admin_username} forge"
-SSH_PERMIT_ROOT_LOGIN="no"
+SSH_ALLOWED_USERS="root {admin_username} forge"
+SSH_PERMIT_ROOT_LOGIN="prohibit-password"
 
 # Laravel Forge Integration
-# The builder provisions servers intended for Laravel Forge, so enable Forge-specific
-# SSH Match rules and fail2ban allowlisting when setup.sh is run after Forge provisioning.
 ENABLE_FORGE_INTEGRATION="true"
-ENABLE_FORGE_ROOT_MATCH="true"
+ENABLE_FORGE_ROOT_MATCH="false"
 FORGE_IPS="159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124"
+
+# Fail2ban Configuration
+FAIL2BAN_MAXRETRY="6"
+FAIL2BAN_FINDTIME="600"
+FAIL2BAN_BANTIME="86400"
+FAIL2BAN_IGNOREIP="127.0.0.1/8 ::1 159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124"
 
 # Storage Configuration
 TFS_STORAGE_ACCOUNT="{storage_info['name']}"
@@ -2657,8 +2661,8 @@ TFS_HARDENING_BLOB_URL="{storage_info['url']}/{HARDENING_REPORTS_CONTAINER}/{ser
 TFS_COMPLIANCE_BLOB_URL="{storage_info['url']}/{COMPLIANCE_REPORTS_CONTAINER}/{server_name}"
 
 # Report file naming
-# Hardening:  hardening-{{hostname}}-{{timestamp}}.txt (permanent)
-# Compliance: compliance-{{hostname}}-{{timestamp}}.txt (5 year retention)
+# Hardening:  hardening-{{hostname}}-{{timestamp}}.md (permanent)
+# Compliance: compliance-{{hostname}}-{{timestamp}}.md (5 year retention)
 """
     return config_content
 

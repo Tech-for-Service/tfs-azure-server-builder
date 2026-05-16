@@ -110,15 +110,19 @@ load_config() {
     FORGE_IPS="${FORGE_IPS:-159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124}"
 
     if [[ "${ENABLE_FORGE_INTEGRATION}" == "true" ]]; then
-        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER} forge}"
+        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-root ${SSH_ADMIN_USER} forge}"
+        SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-prohibit-password}"
     else
         SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER}}"
+        SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-no}"
     fi
 
-    SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-no}"
     SSH_ALLOW_TCP_FORWARDING="${SSH_ALLOW_TCP_FORWARDING:-yes}"
 
-    ENABLE_FORGE_ROOT_MATCH="${ENABLE_FORGE_ROOT_MATCH:-${ENABLE_FORGE_INTEGRATION}}"
+    # Forge is now supported by allowing key-only root SSH globally when enabled.
+    # The Match block remains available for compatibility, but defaults to disabled
+    # because SSH_ALLOWED_USERS includes root and PermitRootLogin is prohibit-password.
+    ENABLE_FORGE_ROOT_MATCH="${ENABLE_FORGE_ROOT_MATCH:-false}"
     FORGE_ROOT_PERMIT_LOGIN="${FORGE_ROOT_PERMIT_LOGIN:-prohibit-password}"
     FORGE_MATCH_ALLOWED_USERS="${FORGE_MATCH_ALLOWED_USERS:-root ${SSH_ALLOWED_USERS}}"
     
@@ -676,7 +680,7 @@ upload_setup_report() {
 | **SSH Admin User** | ${SSH_ADMIN_USER:-svcops} |
 | **SSH Allowed Users** | ${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER:-svcops}} |
 | **Forge Integration Enabled** | ${ENABLE_FORGE_INTEGRATION:-false} |
-| **Forge Root Match Enabled** | ${ENABLE_FORGE_ROOT_MATCH:-${ENABLE_FORGE_INTEGRATION:-false}} |
+| **Forge Root Match Enabled** | ${ENABLE_FORGE_ROOT_MATCH:-false} |
 | **Forge IPs** | ${FORGE_IPS:-159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124} |
 | **Fail2ban Max Retry** | ${FAIL2BAN_MAXRETRY:-6} |
 | **Fail2ban Ban Time** | ${FAIL2BAN_BANTIME:-86400}s (24 hours) |

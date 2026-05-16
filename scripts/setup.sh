@@ -9,8 +9,8 @@
 # Location: /etc/tfs/hardening/setup.sh
 # Usage: sudo /etc/tfs/hardening/setup.sh
 #
-# Version: 1.0
-# Last Updated: December 2025
+# Version: 1.1
+# Last Updated: May 2026
 #
 
 set -euo pipefail
@@ -88,10 +88,11 @@ load_config() {
     SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-no}"
     SSH_ALLOW_TCP_FORWARDING="${SSH_ALLOW_TCP_FORWARDING:-yes}"
     
-    FAIL2BAN_MAXRETRY="${FAIL2BAN_MAXRETRY:-3}"
+    FAIL2BAN_MAXRETRY="${FAIL2BAN_MAXRETRY:-6}"
     FAIL2BAN_FINDTIME="${FAIL2BAN_FINDTIME:-600}"
     FAIL2BAN_BANTIME="${FAIL2BAN_BANTIME:-86400}"
-    
+    FAIL2BAN_IGNOREIP="${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1 159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124}"
+
     UFW_ALLOWED_PORTS="${UFW_ALLOWED_PORTS:-22 80 443}"
     
     AUDITD_MAX_LOG_FILE="${AUDITD_MAX_LOG_FILE:-50}"
@@ -557,8 +558,9 @@ upload_setup_report() {
 | Setting | Value |
 |---------|-------|
 | **SSH Allowed Users** | ${SSH_ALLOWED_USERS:-svcops forge} |
-| **Fail2ban Max Retry** | ${FAIL2BAN_MAXRETRY:-3} |
+| **Fail2ban Max Retry** | ${FAIL2BAN_MAXRETRY:-6} |
 | **Fail2ban Ban Time** | ${FAIL2BAN_BANTIME:-86400}s (24 hours) |
+| **Fail2ban Ignore IPs** | ${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1 159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124} |
 | **UFW Allowed Ports** | ${UFW_ALLOWED_PORTS:-22 80 443} |
 
 ---

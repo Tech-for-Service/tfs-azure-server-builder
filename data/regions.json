@@ -71,7 +71,7 @@
       "tfs_code": "wus2"
     },
     {
-      "enabled": false,
+      "enabled": true,
       "country": "US",
       "name": "westus3",
       "display_name": "West US 3",

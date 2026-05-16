@@ -33,6 +33,13 @@
       "ram_gb": 8,
       "cost_month_usd": 75.00,
       "description": "~$75/mo - Intel, 2 vCPU, 8 GB RAM (Burstable)"
+    },
+    {
+      "code": "Standard_D4als_v7",
+      "vcpu": 4,
+      "ram_gb": 8,
+      "cost_month_usd": 117.53,
+      "description": "~$118/mo - AMD, 4 vCPU, 8 GB RAM (General Purpose)"
     }
   ]
 }

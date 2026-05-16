@@ -100,6 +100,17 @@ contains_space_list_item() {
     return 1
 }
 
+normalize_fail2ban_ignoreip() {
+    local ip="$1"
+
+    # Fail2ban normalizes 127.0.0.1/8 to the actual network 127.0.0.0/8.
+    if [[ "$ip" == "127.0.0.1/8" ]]; then
+        echo "127.0.0.0/8"
+    else
+        echo "$ip"
+    fi
+}
+
 sudo_nopasswd_line_is_expected() {
     local line="$1"
 
@@ -459,7 +470,10 @@ check_fail2ban() {
             check_info "SSH jail ignoreip: $configured_ignoreip"
 
             for ip in $FAIL2BAN_IGNOREIP; do
-                if contains_space_list_item "$ip" "$configured_ignoreip"; then
+                local normalized_ip
+                normalized_ip="$(normalize_fail2ban_ignoreip "$ip")"
+
+                if contains_space_list_item "$normalized_ip" "$configured_ignoreip"; then
                     check_pass "Fail2ban ignoreip includes $ip"
                 else
                     check_fail "Fail2ban ignoreip missing expected IP/range: $ip"
@@ -714,12 +728,36 @@ check_auditd() {
 # SECTION 9: SERVICE VERIFICATION
 # =============================================================================
 
+check_php_fpm_services() {
+    local found=false
+    local active=false
+    local service
+
+    while IFS= read -r service; do
+        [[ -z "$service" ]] && continue
+        found=true
+        service="${service%.service}"
+
+        if systemctl is-active --quiet "$service"; then
+            check_pass "PHP-FPM ($service): Running"
+            active=true
+        else
+            check_warn "PHP-FPM ($service): Installed but not running"
+        fi
+    done < <(systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}')
+
+    if [[ "$found" == "false" ]]; then
+        check_info "PHP-FPM: Not installed"
+    elif [[ "$active" == "false" ]]; then
+        check_warn "PHP-FPM installed but no php*-fpm service is active"
+    fi
+}
+
 check_services() {
     section_header "SECTION 9: SERVICE VERIFICATION"
 
     local -A services=(
         ["nginx"]="Web server"
-        ["php8.3-fpm"]="PHP-FPM"
         ["mysql"]="MySQL Database"
         ["redis-server"]="Redis Cache"
         ["supervisor"]="Process Supervisor"
@@ -743,6 +781,8 @@ check_services() {
             check_info "$desc ($service): Not installed"
         fi
     done
+
+    check_php_fpm_services
 }
 
 # =============================================================================

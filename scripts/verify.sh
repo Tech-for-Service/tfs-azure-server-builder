@@ -164,16 +164,17 @@ load_config() {
     FORGE_IPS="${FORGE_IPS:-159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124}"
 
     if [[ "${ENABLE_FORGE_INTEGRATION}" == "true" ]]; then
-        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-root ${SSH_ADMIN_USER} forge}"
         SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-prohibit-password}"
     else
-        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER}}"
         SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-no}"
     fi
 
+    # Do not use SSH AllowUsers. Forge creates per-site Linux users dynamically,
+    # and key-only authentication is the SSH access control policy.
+    SSH_USE_ALLOW_USERS="${SSH_USE_ALLOW_USERS:-false}"
+
     ENABLE_FORGE_ROOT_MATCH="${ENABLE_FORGE_ROOT_MATCH:-false}"
     FORGE_ROOT_PERMIT_LOGIN="${FORGE_ROOT_PERMIT_LOGIN:-prohibit-password}"
-    FORGE_MATCH_ALLOWED_USERS="${FORGE_MATCH_ALLOWED_USERS:-root ${SSH_ALLOWED_USERS}}"
 
     # Fail2ban defaults should match setup.sh
     FAIL2BAN_MAXRETRY="${FAIL2BAN_MAXRETRY:-6}"
@@ -329,46 +330,15 @@ check_ssh() {
     check_ssh_setting "x11forwarding" "no" "X11 forwarding disabled"
     check_ssh_setting "maxauthtries" "3" "Max auth tries"
 
-    # Confirm configured users are allowed in the global SSH context.
+    # The current policy intentionally does not use AllowUsers.
+    # Forge creates per-site Linux users dynamically, so AllowUsers breaks site SSH access.
     local allowusers
     allowusers=$(sshd -T 2>/dev/null | grep -i "^allowusers " | cut -d' ' -f2- || true)
 
     if [[ -n "$allowusers" ]]; then
-        check_info "SSH AllowUsers: $allowusers"
-
-        for user in $SSH_ALLOWED_USERS; do
-            if echo "$allowusers" | grep -qw "$user"; then
-                check_pass "SSH AllowUsers includes $user"
-            else
-                check_fail "SSH AllowUsers missing expected user: $user"
-            fi
-        done
-
-        if [[ "$ENABLE_FORGE_INTEGRATION" == "true" ]]; then
-            if echo "$allowusers" | grep -qw "forge"; then
-                check_pass "SSH AllowUsers includes forge for Forge integration"
-            else
-                check_fail "SSH AllowUsers does not include forge while Forge integration is enabled"
-            fi
-        else
-            check_info "Forge integration disabled; not requiring forge in global AllowUsers"
-        fi
-
-        if echo "$allowusers" | grep -qw "root"; then
-            if [[ "$SSH_PERMIT_ROOT_LOGIN" == "prohibit-password" && "$ENABLE_FORGE_INTEGRATION" == "true" ]]; then
-                check_pass "Global SSH AllowUsers includes root for Forge key-only access"
-            else
-                check_warn "Global SSH AllowUsers includes root"
-            fi
-        else
-            if [[ "$SSH_PERMIT_ROOT_LOGIN" == "prohibit-password" && "$ENABLE_FORGE_INTEGRATION" == "true" ]]; then
-                check_fail "Forge integration expects root in global SSH AllowUsers"
-            else
-                check_pass "Global SSH AllowUsers does not include root"
-            fi
-        fi
+        check_fail "SSH AllowUsers is configured but policy allows any key-authenticated SSH user: $allowusers"
     else
-        check_warn "SSH AllowUsers is not configured"
+        check_pass "SSH AllowUsers is not configured; any valid key-authenticated Linux user may SSH"
     fi
 
     if [[ -f "/etc/ssh/sshd_config.d/99-hardening.conf" ]]; then

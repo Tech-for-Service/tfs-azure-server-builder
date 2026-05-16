@@ -91,8 +91,8 @@ VERSION = "1.2.1"
 #   sha256sum scripts/setup.sh scripts/verify.sh
 # Then update these values and commit everything together
 SCRIPT_CHECKSUMS = {
-    'setup.sh': 'd845479297495f0b5c88a7e2554408f6d441cc9d4fe87310304a0a985e225743',
-    'verify.sh': '4cdc2516289cca602d0f08542f6f8bd6281259acb160dcd5893f27c8e40eec23'
+    'setup.sh': 'bc36bf5120bf1a21cf7b61cb2a0d6b036308b1726c5bf0e2ae5df1b0ec2daabf',
+    'verify.sh': '545dd9f79b9125c9ef910b4030d11b5a8cb7fead2128d9aa91d2a0a9c76b0511'
 }
 
 # =============================================================================
@@ -2630,7 +2630,7 @@ TFS_SUBSCRIPTION_ID="{subscription_id}"
 # This ensures the Azure VM admin user selected during provisioning remains SSH-allowed
 # after /etc/tfs/hardening/setup.sh writes /etc/ssh/sshd_config.d/99-hardening.conf.
 SSH_ADMIN_USER="{admin_username}"
-SSH_ALLOWED_USERS="root {admin_username} forge"
+SSH_USE_ALLOW_USERS="false"
 SSH_PERMIT_ROOT_LOGIN="prohibit-password"
 
 # Laravel Forge Integration

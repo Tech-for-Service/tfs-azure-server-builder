@@ -110,21 +110,20 @@ load_config() {
     FORGE_IPS="${FORGE_IPS:-159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124}"
 
     if [[ "${ENABLE_FORGE_INTEGRATION}" == "true" ]]; then
-        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-root ${SSH_ADMIN_USER} forge}"
         SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-prohibit-password}"
     else
-        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER}}"
         SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-no}"
     fi
 
+    # Do not write AllowUsers. Forge creates per-site Linux users dynamically,
+    # and key-only authentication is enforced below instead.
+    SSH_USE_ALLOW_USERS="${SSH_USE_ALLOW_USERS:-false}"
     SSH_ALLOW_TCP_FORWARDING="${SSH_ALLOW_TCP_FORWARDING:-yes}"
 
-    # Forge is now supported by allowing key-only root SSH globally when enabled.
-    # The Match block remains available for compatibility, but defaults to disabled
-    # because SSH_ALLOWED_USERS includes root and PermitRootLogin is prohibit-password.
+    # Forge root Match blocks are disabled by default because root is handled
+    # globally through PermitRootLogin prohibit-password when Forge integration is enabled.
     ENABLE_FORGE_ROOT_MATCH="${ENABLE_FORGE_ROOT_MATCH:-false}"
     FORGE_ROOT_PERMIT_LOGIN="${FORGE_ROOT_PERMIT_LOGIN:-prohibit-password}"
-    FORGE_MATCH_ALLOWED_USERS="${FORGE_MATCH_ALLOWED_USERS:-root ${SSH_ALLOWED_USERS}}"
     
     FAIL2BAN_MAXRETRY="${FAIL2BAN_MAXRETRY:-6}"
     FAIL2BAN_FINDTIME="${FAIL2BAN_FINDTIME:-600}"
@@ -191,7 +190,7 @@ apply_ssh_hardening() {
     
     info "Creating SSH hardening configuration..."
     info "SSH admin user: ${SSH_ADMIN_USER}"
-    info "SSH allowed users: ${SSH_ALLOWED_USERS}"
+    info "SSH user allowlisting: disabled (key-only SSH enforced)"
     info "Forge integration: ${ENABLE_FORGE_INTEGRATION}"
 
     backup_file "$SSH_HARDENING_FILE"
@@ -215,8 +214,9 @@ AuthenticationMethods publickey
 MaxAuthTries 3
 LoginGraceTime 60
 
-# Allowed Users
-AllowUsers ${SSH_ALLOWED_USERS}
+# User Allowlisting
+# Intentionally no AllowUsers directive. Forge creates per-site Linux users dynamically.
+# Access is restricted by key-only authentication instead.
 
 # Session
 ClientAliveInterval 300
@@ -247,7 +247,6 @@ EOF
 # this exception is limited to known Forge source IPs and still requires public key authentication.
 Match Address ${forge_ips_csv}
     PermitRootLogin ${FORGE_ROOT_PERMIT_LOGIN}
-    AllowUsers ${FORGE_MATCH_ALLOWED_USERS}
 EOF
     fi
     
@@ -678,7 +677,7 @@ upload_setup_report() {
 | Setting | Value |
 |---------|-------|
 | **SSH Admin User** | ${SSH_ADMIN_USER:-svcops} |
-| **SSH Allowed Users** | ${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER:-svcops}} |
+| **SSH AllowUsers Directive** | disabled (key-only SSH enforced) |
 | **Forge Integration Enabled** | ${ENABLE_FORGE_INTEGRATION:-false} |
 | **Forge Root Match Enabled** | ${ENABLE_FORGE_ROOT_MATCH:-false} |
 | **Forge IPs** | ${FORGE_IPS:-159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124} |

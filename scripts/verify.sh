@@ -9,7 +9,7 @@
 # Location: /etc/tfs/hardening/verify.sh
 # Usage: sudo /etc/tfs/hardening/verify.sh
 #
-# Version: 1.1
+# Version: 1.2.1
 # Last Updated: May 2026
 #
 
@@ -101,11 +101,34 @@ load_config() {
     TFS_COMPLIANCE_CONTAINER="${TFS_COMPLIANCE_CONTAINER:-tfs-compliance-reports}"
     TFS_SERVER_NAME="${TFS_SERVER_NAME:-$(hostname -s)}"
 
+    # SSH / Forge defaults should match setup.sh
+    # SSH_ADMIN_USER is written by azure-server-builder. Falls back to svcops for legacy servers.
+    SSH_ADMIN_USER="${SSH_ADMIN_USER:-svcops}"
+
+    # Forge integration is optional. Set ENABLE_FORGE_INTEGRATION=true in config.env for Laravel Forge servers.
+    ENABLE_FORGE_INTEGRATION="${ENABLE_FORGE_INTEGRATION:-false}"
+    FORGE_IPS="${FORGE_IPS:-159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124}"
+
+    if [[ "${ENABLE_FORGE_INTEGRATION}" == "true" ]]; then
+        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER} forge}"
+    else
+        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER}}"
+    fi
+
+    SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-no}"
+    ENABLE_FORGE_ROOT_MATCH="${ENABLE_FORGE_ROOT_MATCH:-${ENABLE_FORGE_INTEGRATION}}"
+    FORGE_ROOT_PERMIT_LOGIN="${FORGE_ROOT_PERMIT_LOGIN:-prohibit-password}"
+    FORGE_MATCH_ALLOWED_USERS="${FORGE_MATCH_ALLOWED_USERS:-root ${SSH_ALLOWED_USERS}}"
+
     # Fail2ban defaults should match setup.sh
     FAIL2BAN_MAXRETRY="${FAIL2BAN_MAXRETRY:-6}"
     FAIL2BAN_FINDTIME="${FAIL2BAN_FINDTIME:-600}"
     FAIL2BAN_BANTIME="${FAIL2BAN_BANTIME:-86400}"
-    FAIL2BAN_IGNOREIP="${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1 159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124}"
+    if [[ "${ENABLE_FORGE_INTEGRATION}" == "true" ]]; then
+        FAIL2BAN_IGNOREIP="${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1 ${FORGE_IPS}}"
+    else
+        FAIL2BAN_IGNOREIP="${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1}"
+    fi
 }
 
 # =============================================================================
@@ -228,6 +251,8 @@ check_ssh() {
     }
 
     check_info "Verifying SSH configuration..."
+    check_info "SSH admin user expected: ${SSH_ADMIN_USER}"
+    check_info "Forge integration expected: ${ENABLE_FORGE_INTEGRATION}"
 
     if systemctl is-active --quiet ssh; then
         check_pass "SSH service running"
@@ -235,36 +260,42 @@ check_ssh() {
         check_fail "SSH service not running"
     fi
 
-    check_ssh_setting "permitrootlogin" "no" "Root login disabled"
+    check_ssh_setting "permitrootlogin" "${SSH_PERMIT_ROOT_LOGIN}" "Global root login setting"
     check_ssh_setting "passwordauthentication" "no" "Password auth disabled"
     check_ssh_setting "pubkeyauthentication" "yes" "Public key auth enabled"
     check_ssh_setting "permitemptypasswords" "no" "Empty passwords disabled"
     check_ssh_setting "x11forwarding" "no" "X11 forwarding disabled"
     check_ssh_setting "maxauthtries" "3" "Max auth tries"
 
-    # Confirm forge is allowed when AllowUsers is configured
+    # Confirm configured users are allowed in the global SSH context.
     local allowusers
     allowusers=$(sshd -T 2>/dev/null | grep -i "^allowusers " | cut -d' ' -f2- || true)
 
     if [[ -n "$allowusers" ]]; then
         check_info "SSH AllowUsers: $allowusers"
 
-        if echo "$allowusers" | grep -qw "forge"; then
-            check_pass "SSH AllowUsers includes forge"
-        else
-            check_fail "SSH AllowUsers does not include forge"
-        fi
+        for user in $SSH_ALLOWED_USERS; do
+            if echo "$allowusers" | grep -qw "$user"; then
+                check_pass "SSH AllowUsers includes $user"
+            else
+                check_fail "SSH AllowUsers missing expected user: $user"
+            fi
+        done
 
-        if echo "$allowusers" | grep -qw "svcops"; then
-            check_pass "SSH AllowUsers includes svcops"
+        if [[ "$ENABLE_FORGE_INTEGRATION" == "true" ]]; then
+            if echo "$allowusers" | grep -qw "forge"; then
+                check_pass "SSH AllowUsers includes forge for Forge integration"
+            else
+                check_fail "SSH AllowUsers does not include forge while Forge integration is enabled"
+            fi
         else
-            check_warn "SSH AllowUsers does not include svcops"
+            check_info "Forge integration disabled; not requiring forge in global AllowUsers"
         fi
 
         if echo "$allowusers" | grep -qw "root"; then
-            check_warn "SSH AllowUsers includes root"
+            check_warn "Global SSH AllowUsers includes root"
         else
-            check_pass "SSH AllowUsers does not include root"
+            check_pass "Global SSH AllowUsers does not include root"
         fi
     else
         check_warn "SSH AllowUsers is not configured"
@@ -272,11 +303,30 @@ check_ssh() {
 
     if [[ -f "/etc/ssh/sshd_config.d/99-hardening.conf" ]]; then
         check_pass "Hardening config file exists"
+
+        if [[ "$ENABLE_FORGE_INTEGRATION" == "true" && "$ENABLE_FORGE_ROOT_MATCH" == "true" ]]; then
+            if grep -q "^Match Address" /etc/ssh/sshd_config.d/99-hardening.conf; then
+                check_pass "Forge SSH Match Address block exists"
+            else
+                check_fail "Forge integration enabled but SSH Match Address block is missing"
+            fi
+
+            if grep -q "PermitRootLogin ${FORGE_ROOT_PERMIT_LOGIN}" /etc/ssh/sshd_config.d/99-hardening.conf; then
+                check_pass "Forge Match block permits root as configured: ${FORGE_ROOT_PERMIT_LOGIN}"
+            else
+                check_warn "Could not confirm Forge Match block PermitRootLogin setting"
+            fi
+        else
+            if grep -q "^Match Address" /etc/ssh/sshd_config.d/99-hardening.conf; then
+                check_warn "SSH Match Address block exists while Forge integration/root match is disabled"
+            else
+                check_pass "No Forge SSH Match Address block required"
+            fi
+        fi
     else
         check_warn "Hardening config file missing"
     fi
 }
-
 # =============================================================================
 # SECTION 4: FIREWALL (UFW)
 # =============================================================================
@@ -400,27 +450,31 @@ check_fail2ban() {
 check_users() {
     section_header "SECTION 6: USER CONFIGURATION"
 
-    if id "svcops" &>/dev/null; then
-        check_pass "User 'svcops' exists"
+    if id "$SSH_ADMIN_USER" &>/dev/null; then
+        check_pass "SSH admin user '$SSH_ADMIN_USER' exists"
 
         set +e
-        groups svcops | grep -q "sudo" 2>/dev/null
+        groups "$SSH_ADMIN_USER" | grep -q "sudo" 2>/dev/null
         local has_sudo=$?
         set -e
 
         if [[ $has_sudo -eq 0 ]]; then
-            check_pass "User 'svcops' has sudo access"
+            check_pass "SSH admin user '$SSH_ADMIN_USER' has sudo access"
         else
-            check_warn "User 'svcops' does not have sudo access"
+            check_warn "SSH admin user '$SSH_ADMIN_USER' does not have sudo access"
         fi
     else
-        check_fail "User 'svcops' does not exist"
+        check_fail "SSH admin user '$SSH_ADMIN_USER' does not exist"
     fi
 
-    if id "forge" &>/dev/null; then
-        check_pass "User 'forge' exists"
+    if [[ "$ENABLE_FORGE_INTEGRATION" == "true" ]]; then
+        if id "forge" &>/dev/null; then
+            check_pass "User 'forge' exists"
+        else
+            check_fail "Forge integration enabled but user 'forge' does not exist"
+        fi
     else
-        check_warn "User 'forge' does not exist"
+        check_info "Forge integration disabled; not requiring user 'forge'"
     fi
 
     log ""
@@ -444,16 +498,16 @@ check_users() {
 
     while IFS= read -r line; do
         if [[ -n "$line" && ! "$line" =~ ^# ]]; then
-            if [[ "$line" =~ forge[[:space:]]ALL ]]; then
+            if [[ "$ENABLE_FORGE_INTEGRATION" == "true" && "$line" =~ forge[[:space:]]ALL ]]; then
                 ((forge_count++)) || true
             else
                 check_warn "  $line"
                 other_found=true
             fi
         fi
-    done < <(grep -r "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null | grep -v "^#")
+    done < <(grep -r "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null | grep -v "^#" || true)
 
-    if [[ $forge_count -gt 0 ]]; then
+    if [[ "$ENABLE_FORGE_INTEGRATION" == "true" && $forge_count -gt 0 ]]; then
         check_info "  forge user has $forge_count NOPASSWD sudo rule(s) required for Laravel Forge functionality"
     fi
 
@@ -509,8 +563,13 @@ check_users() {
     done
 
     log ""
-    check_info "Last login per user:"
-    for user in root svcops forge; do
+    check_info "Last login per managed user:"
+    local managed_users=("root" "$SSH_ADMIN_USER")
+    if [[ "$ENABLE_FORGE_INTEGRATION" == "true" ]]; then
+        managed_users+=("forge")
+    fi
+
+    for user in "${managed_users[@]}"; do
         if id "$user" &>/dev/null; then
             local last_login
             last_login=$(lastlog -u "$user" 2>/dev/null | tail -1)
@@ -541,7 +600,6 @@ check_users() {
         [[ -n "$line" && ! "$line" =~ "wtmp begins" ]] && check_info "  $line"
     done || true
 }
-
 # =============================================================================
 # SECTION 7: KERNEL HARDENING
 # =============================================================================
@@ -777,7 +835,7 @@ main() {
 
     log "# TFS Server Hardening - Compliance Report"
     log ""
-    log "**Version:** 1.1"
+    log "**Version:** 1.2.1"
     log "**Started:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
     log "**Server:** ${TFS_SERVER_NAME}"
     log ""

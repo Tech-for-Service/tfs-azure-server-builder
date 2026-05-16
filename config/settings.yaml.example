@@ -1,0 +1,225 @@
+# TFS Azure Server Builder Configuration
+# Schema version tracks config format compatibility (Semantic Versioning)
+schema_version: "1.2.1"
+
+# Environment definitions (dev, staging, production)
+environments:
+  - code: dev
+    name: Development
+    disk_redundancy: StandardSSD_LRS
+    default_size: Standard_B2als_v2
+  - code: stg
+    name: Staging
+    disk_redundancy: StandardSSD_LRS
+    default_size: Standard_B2als_v2
+  - code: prd
+    name: Production
+    disk_redundancy: StandardSSD_ZRS
+    default_size: Standard_B2s_v2
+    default: true
+
+# Server role definitions
+roles:
+  - code: app
+    name: Application server
+    default: true
+  - code: db
+    name: Database server
+  - code: worker
+    name: Background workers
+  - code: cache
+    name: Cache server
+  - code: edge
+    name: Edge/reverse proxy
+  - code: util
+    name: Utility server
+
+# Azure regions
+# Regions have been moved to: data/regions.json
+# The builder will automatically load regions from that file if it exists
+# This section is kept as a fallback if the data file is missing
+# Default region is "southcentralus" (matching data/regions.json metadata)
+regions:
+  - enabled: true
+    country: US
+    name: southcentralus
+    display_name: South Central US
+    location: Texas
+    tfs_code: scu1
+
+# Project/client scopes
+scopes:
+  - code: corp
+    name: Corporate
+    description: Corporate infrastructure
+    default: true
+  - code: dev
+    name: Development
+    description: Development and testing
+  - code: client
+    name: Client Projects
+    description: Client-specific resources
+
+# Allow custom scope input (not from predefined list)
+allow_custom_scope: true
+
+# Available VM sizes
+# VM sizes have been moved to: data/armSkus.json
+# The builder will automatically load vm_sizes from that file if it exists
+# This section is kept as a fallback if the data file is missing
+vm_sizes:
+  - code: Standard_B2als_v2
+    vcpu: 2
+    ram_gb: 4
+    cost_month_usd: 35.00
+    description: ~$35/mo - AMD, 2 vCPU, 4 GB RAM (Burstable with local disk)
+
+# Disk size options (GB)
+# These are the quick-select options shown by default
+# Users can also select "Other" to configure custom disk settings:
+#   - Tier: Standard SSD or Premium SSD
+#   - Redundancy: LRS (Locally Redundant) or ZRS (Zone Redundant)
+#   - Size: Valid Azure sizes from 64GB to 2TB (64, 128, 256, 512, 1024, 2048)
+disk_sizes:
+  - gb: 64
+    default: true
+  - gb: 128
+  - gb: 256
+  - gb: 512
+
+# OS image definitions
+os_images:
+  - name: Ubuntu 24.04 LTS
+    publisher: canonical
+    offer: ubuntu-24_04-lts
+    sku: server
+    version: latest
+    default: true
+
+# Network Security Group configuration
+nsg:
+  # Fallback IP if personal IP detection fails
+  ssh_personal_fallback_ip: "8.8.8.8"
+
+  # Laravel Forge IP addresses (allow SSH from these)
+  forge_ips:
+    - "45.55.124.124"
+    - "159.203.150.216"
+    - "159.203.150.232"
+    - "165.227.248.218"
+
+  # Services to detect user's public IP
+  ip_detection_services:
+    - "https://api.ipify.org"
+    - "https://ifconfig.me/ip"
+    - "https://icanhazip.com"
+
+  # NSG security rules
+  rules:
+    - name: HTTP
+      priority: 310
+      port: "80"
+      protocol: Tcp
+      source: "*"
+      destination: "*"
+      access: Allow
+      direction: Inbound
+
+    - name: HTTPS
+      priority: 320
+      port: "443"
+      protocol: Tcp
+      source: "*"
+      destination: "*"
+      access: Allow
+      direction: Inbound
+
+    - name: SSH-Personal
+      priority: 330
+      port: "22"
+      protocol: Tcp
+      source: "{user_ip}"
+      destination: "*"
+      access: Allow
+      direction: Inbound
+
+    - name: SSH-Forge
+      priority: 340
+      port: "22"
+      protocol: Tcp
+      source: "{forge_ips}"
+      destination: "*"
+      access: Allow
+      direction: Inbound
+
+# Azure Monitor alerts configuration
+alerts:
+  enabled_by_default: true
+  rules:
+    - name: Percentage CPU
+      metric: Percentage CPU
+      operator: GreaterThan
+      threshold: 90
+      aggregation: Average
+
+    - name: Available Memory Bytes
+      metric: Available Memory Bytes
+      operator: LessThan
+      threshold: 524288000
+      aggregation: Average
+
+    - name: OS Disk IOPS Consumed Percentage
+      metric: OS Disk IOPS Consumed Percentage
+      operator: GreaterThan
+      threshold: 95
+      aggregation: Average
+
+    - name: VM Availability
+      metric: VmAvailabilityMetric
+      operator: LessThan
+      threshold: 1
+      aggregation: Average
+
+    - name: Network In Total
+      metric: Network In Total
+      operator: GreaterThan
+      threshold: 500000000000
+      aggregation: Total
+
+    - name: Network Out Total
+      metric: Network Out Total
+      operator: GreaterThan
+      threshold: 200000000000
+      aggregation: Total
+
+# Default values
+defaults:
+  admin_username: svcops
+  managed_by: Forge
+  infra_standard_version: v1
+  vnet_address_space: 10.0.0.0/16
+  subnet_prefix: 10.0.0.0/24
+  github_org: Tech-for-Service
+
+# Security settings (applied to all VMs)
+security:
+  security_type: TrustedLaunch
+  secure_boot: true
+  vtpm: true
+  encryption_at_host: true
+  disable_password_auth: true
+  public_ip_sku: Standard
+  public_ip_allocation: Static
+
+# OS patching configuration
+patching:
+  periodic_assessment: AutomaticByPlatform
+  patch_mode: ImageDefault
+
+# Azure resource tags
+tags:
+  infra_standard_tag: InfraStandard
+  environment_tag: Environment
+  scope_tag: Scope
+  role_tag: Role
+  managed_by_tag: ManagedBy

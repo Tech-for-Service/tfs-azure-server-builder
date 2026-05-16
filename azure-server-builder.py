@@ -20,8 +20,8 @@ Workflow:
     5. User runs: sudo /etc/tfs/hardening/setup.sh
     6. Weekly: verify.sh runs via cron, uploads reports
 
-Version: 0.2.0
-Last Updated: December 2025
+Version: 1.2.1
+Last Updated: May 2026
 """
 
 import json
@@ -78,7 +78,7 @@ except ImportError as e:
 
 # Version for both tool and config schema (Semantic Versioning: MAJOR.MINOR.PATCH)
 # Tool version and schema version are kept in sync
-VERSION = "0.2.0"
+VERSION = "1.2.1"
 
 # =============================================================================
 # Script Integrity Verification
@@ -91,8 +91,8 @@ VERSION = "0.2.0"
 #   sha256sum scripts/setup.sh scripts/verify.sh
 # Then update these values and commit everything together
 SCRIPT_CHECKSUMS = {
-    'setup.sh': '8cdb94c3cc3b1314f946eb63ec96b198e7fdebc3c70d5446202cee9fb1fe779b',
-    'verify.sh': 'fcffd8f043b0c639bbe411f806b53d0f05a496514915159170239256c1a37994'
+    'setup.sh': 'c4a69597bcdd5dbbd4116aef06b02243adce9605c329fb7155c7587a7563d099',
+    'verify.sh': '8621ee85925e7bc108d8f325944fca37734f4ce6aa66bfe0068f1196f6e57a91'
 }
 
 # =============================================================================
@@ -2475,7 +2475,7 @@ TFS_CONFIG_DIR = "/etc/tfs/hardening"
 TFS_CONFIG_FILE = f"{TFS_CONFIG_DIR}/config.env"
 
 
-def generate_tfs_config(server_name: str, storage_info: Dict, subscription_id: str) -> str:
+def generate_tfs_config(server_name: str, storage_info: Dict, subscription_id: str, admin_username: str) -> str:
     """Generate TFS config file content to be written to /etc/tfs/hardening/config.env on the VM"""
     config_content = f"""# TFS Azure Server Builder Configuration
 # Generated: {datetime.now().isoformat()}
@@ -2485,6 +2485,13 @@ def generate_tfs_config(server_name: str, storage_info: Dict, subscription_id: s
 # Server Identity
 TFS_SERVER_NAME="{server_name}"
 TFS_SUBSCRIPTION_ID="{subscription_id}"
+
+# SSH Hardening Configuration
+# This ensures the Azure VM admin user selected during provisioning remains SSH-allowed
+# after /etc/tfs/hardening/setup.sh writes /etc/ssh/sshd_config.d/99-hardening.conf.
+SSH_ADMIN_USER="{admin_username}"
+SSH_ALLOWED_USERS="{admin_username} forge"
+SSH_PERMIT_ROOT_LOGIN="no"
 
 # Storage Configuration
 TFS_STORAGE_ACCOUNT="{storage_info['name']}"
@@ -3651,7 +3658,12 @@ def deploy_azure_resources(
     vm_tags['TFSComplianceReports'] = f"{COMPLIANCE_REPORTS_CONTAINER}/{server_config.server_name}"
 
     # Generate cloud-init
-    tfs_config = generate_tfs_config(server_config.server_name, storage_info, azure_env.subscription_id)
+    tfs_config = generate_tfs_config(
+        server_config.server_name,
+        storage_info,
+        azure_env.subscription_id,
+        server_config.admin_username
+    )
     github_org = config.get('defaults', {}).get('github_org', 'Tech-for-Service')
     cloud_init_script = generate_tfs_cloud_init(tfs_config, github_org)
 
@@ -4107,6 +4119,22 @@ def setup_azure_environment(config: Dict[str, Any], exec_log: Optional['Executio
 # Global dry-run flag
 DRY_RUN = False
 
+def pause_before_exit():
+    """Keep the console window open at the end of execution.
+
+    This is helpful when the script is launched by double-clicking or from a
+    terminal that closes automatically after the process exits. Set the
+    environment variable TFS_NO_EXIT_PAUSE=1 to skip this pause.
+    """
+    if os.environ.get("TFS_NO_EXIT_PAUSE", "").lower() in ("1", "true", "yes"):
+        return
+
+    try:
+        print()
+        input("Press Enter to close this window...")
+    except (EOFError, KeyboardInterrupt):
+        pass
+
 def main():
     """Main script entry point - orchestrates VM deployment workflow"""
     global DRY_RUN
@@ -4134,6 +4162,7 @@ def main():
             print("  python azure-server-builder.py --dry-run # Preview without deploying")
             print("  python azure-server-builder.py --version # Show version info")
             print("  python azure-server-builder.py --help    # Show this help")
+            print("\nSet TFS_NO_EXIT_PAUSE=1 to skip the final pause.")
             sys.exit(0)
 
         else:
@@ -4251,4 +4280,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        pause_before_exit()

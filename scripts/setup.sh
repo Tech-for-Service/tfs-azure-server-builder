@@ -9,7 +9,7 @@
 # Location: /etc/tfs/hardening/setup.sh
 # Usage: sudo /etc/tfs/hardening/setup.sh
 #
-# Version: 1.1
+# Version: 1.2.1
 # Last Updated: May 2026
 #
 
@@ -65,6 +65,22 @@ section() {
     log ""
 }
 
+backup_file() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        cp "$file" "${file}.bak.${TIMESTAMP}"
+        info "Backed up $file"
+    fi
+}
+
+csv_from_space_list() {
+    local value="$1"
+    value="${value//$'
+'/ }"
+    value="${value//$'	'/ }"
+    echo "$value" | xargs | tr ' ' ','
+}
+
 # =============================================================================
 # LOAD CONFIGURATION
 # =============================================================================
@@ -84,14 +100,36 @@ load_config() {
     ENABLE_AUDITD="${ENABLE_AUDITD:-true}"
     ENABLE_KERNEL_HARDENING="${ENABLE_KERNEL_HARDENING:-true}"
     
-    SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-svcops forge}"
+    # SSH defaults
+    # SSH_ADMIN_USER is written by azure-server-builder. Falls back to svcops for legacy servers.
+    SSH_ADMIN_USER="${SSH_ADMIN_USER:-svcops}"
+
+    # Forge integration is optional. Set ENABLE_FORGE_INTEGRATION=true in config.env for Laravel Forge servers.
+    # Non-Forge servers will not receive Forge-specific SSH Match blocks, fail2ban allowlisting, or warnings.
+    ENABLE_FORGE_INTEGRATION="${ENABLE_FORGE_INTEGRATION:-false}"
+    FORGE_IPS="${FORGE_IPS:-159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124}"
+
+    if [[ "${ENABLE_FORGE_INTEGRATION}" == "true" ]]; then
+        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER} forge}"
+    else
+        SSH_ALLOWED_USERS="${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER}}"
+    fi
+
     SSH_PERMIT_ROOT_LOGIN="${SSH_PERMIT_ROOT_LOGIN:-no}"
     SSH_ALLOW_TCP_FORWARDING="${SSH_ALLOW_TCP_FORWARDING:-yes}"
+
+    ENABLE_FORGE_ROOT_MATCH="${ENABLE_FORGE_ROOT_MATCH:-${ENABLE_FORGE_INTEGRATION}}"
+    FORGE_ROOT_PERMIT_LOGIN="${FORGE_ROOT_PERMIT_LOGIN:-prohibit-password}"
+    FORGE_MATCH_ALLOWED_USERS="${FORGE_MATCH_ALLOWED_USERS:-root ${SSH_ALLOWED_USERS}}"
     
     FAIL2BAN_MAXRETRY="${FAIL2BAN_MAXRETRY:-6}"
     FAIL2BAN_FINDTIME="${FAIL2BAN_FINDTIME:-600}"
     FAIL2BAN_BANTIME="${FAIL2BAN_BANTIME:-86400}"
-    FAIL2BAN_IGNOREIP="${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1 159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124}"
+    if [[ "${ENABLE_FORGE_INTEGRATION}" == "true" ]]; then
+        FAIL2BAN_IGNOREIP="${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1 ${FORGE_IPS}}"
+    else
+        FAIL2BAN_IGNOREIP="${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1}"
+    fi
 
     UFW_ALLOWED_PORTS="${UFW_ALLOWED_PORTS:-22 80 443}"
     
@@ -148,6 +186,16 @@ apply_ssh_hardening() {
     local SSH_HARDENING_FILE="/etc/ssh/sshd_config.d/99-hardening.conf"
     
     info "Creating SSH hardening configuration..."
+    info "SSH admin user: ${SSH_ADMIN_USER}"
+    info "SSH allowed users: ${SSH_ALLOWED_USERS}"
+    info "Forge integration: ${ENABLE_FORGE_INTEGRATION}"
+
+    backup_file "$SSH_HARDENING_FILE"
+
+    local forge_ips_csv=""
+    if [[ "$ENABLE_FORGE_ROOT_MATCH" == "true" ]]; then
+        forge_ips_csv="$(csv_from_space_list "$FORGE_IPS")"
+    fi
     
     cat > "$SSH_HARDENING_FILE" << EOF
 # TFS Server Hardening - SSH Configuration
@@ -185,6 +233,19 @@ KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
 # Logging
 LogLevel VERBOSE
 EOF
+
+    if [[ "$ENABLE_FORGE_ROOT_MATCH" == "true" ]]; then
+        cat >> "$SSH_HARDENING_FILE" << EOF
+
+# Laravel Forge management access
+# Forge requires its public key in both /home/forge/.ssh/authorized_keys and /root/.ssh/authorized_keys
+# for some server actions such as database/tunnel operations. Root SSH remains disabled globally above;
+# this exception is limited to known Forge source IPs and still requires public key authentication.
+Match Address ${forge_ips_csv}
+    PermitRootLogin ${FORGE_ROOT_PERMIT_LOGIN}
+    AllowUsers ${FORGE_MATCH_ALLOWED_USERS}
+EOF
+    fi
     
     chmod 600 "$SSH_HARDENING_FILE"
     
@@ -195,6 +256,46 @@ EOF
     else
         error "SSH config test failed - check $SSH_HARDENING_FILE"
         return 1
+    fi
+}
+
+
+# =============================================================================
+# FORGE KEY CHECK
+# =============================================================================
+
+check_forge_root_key() {
+    if [[ "$ENABLE_FORGE_INTEGRATION" != "true" || "$ENABLE_FORGE_ROOT_MATCH" != "true" ]]; then
+        return 0
+    fi
+
+    local forge_keys="/home/forge/.ssh/authorized_keys"
+    local root_keys="/root/.ssh/authorized_keys"
+
+    if [[ ! -f "$forge_keys" ]]; then
+        warn "Forge authorized_keys not found at $forge_keys; Forge may not have provisioned yet"
+        return 0
+    fi
+
+    if [[ ! -f "$root_keys" ]]; then
+        warn "Root authorized_keys not found at $root_keys"
+        warn "Laravel Forge may require its public key in both /home/forge/.ssh/authorized_keys and /root/.ssh/authorized_keys for some actions"
+        return 0
+    fi
+
+    local missing_count=0
+    while IFS= read -r key; do
+        [[ -z "$key" || ! "$key" =~ ^ssh- ]] && continue
+        if ! grep -Fxq "$key" "$root_keys"; then
+            ((missing_count++)) || true
+        fi
+    done < "$forge_keys"
+
+    if [[ $missing_count -gt 0 ]]; then
+        warn "$missing_count key(s) from /home/forge/.ssh/authorized_keys are missing from /root/.ssh/authorized_keys"
+        warn "If Forge database or tunnel actions fail, add the Forge key shown in Forge to root's authorized_keys"
+    else
+        success "Root authorized_keys contains the same SSH key(s) present for forge"
     fi
 }
 
@@ -265,6 +366,7 @@ apply_fail2ban() {
     local JAIL_LOCAL="/etc/fail2ban/jail.local"
     
     info "Configuring Fail2ban..."
+    backup_file "$JAIL_LOCAL"
     
     cat > "$JAIL_LOCAL" << EOF
 # TFS Server Hardening - Fail2ban Configuration
@@ -279,8 +381,8 @@ maxretry = ${FAIL2BAN_MAXRETRY}
 # Use UFW for banning
 banaction = ufw
 
-# Ignore local IPs
-ignoreip = 127.0.0.1/8 ::1
+# Ignore trusted management IPs
+ignoreip = ${FAIL2BAN_IGNOREIP}
 
 [sshd]
 enabled = true
@@ -311,6 +413,7 @@ EOF
     systemctl enable fail2ban
     
     success "Fail2ban configured: ${FAIL2BAN_MAXRETRY} failures = $(( FAIL2BAN_BANTIME / 3600 ))hr ban"
+    info "Fail2ban ignore IPs: ${FAIL2BAN_IGNOREIP}"
 }
 
 # =============================================================================
@@ -328,6 +431,7 @@ apply_kernel_hardening() {
     local SYSCTL_FILE="/etc/sysctl.d/99-hardening.conf"
     
     info "Applying kernel hardening parameters..."
+    backup_file "$SYSCTL_FILE"
     
     cat > "$SYSCTL_FILE" << EOF
 # TFS Server Hardening - Kernel Parameters
@@ -388,6 +492,18 @@ apply_auditd() {
     local AUDITD_CONF="/etc/audit/auditd.conf"
     
     info "Configuring audit rules..."
+
+    # If audit rules are immutable (-e 2), they cannot be changed until reboot.
+    # Treat this as a successful no-op so future setup versions can be rerun safely.
+    local audit_enabled
+    audit_enabled=$(auditctl -s 2>/dev/null | awk '/enabled/ {print $2}' || true)
+    if [[ "$audit_enabled" == "2" ]]; then
+        warn "Audit rules are immutable until reboot; skipping audit rule rewrite for safe rerun"
+        warn "Reboot and rerun setup.sh if you need to apply updated audit rules"
+        return 0
+    fi
+
+    backup_file "$AUDIT_RULES"
     
     cat > "$AUDIT_RULES" << 'EOF'
 # TFS Server Hardening - Audit Rules
@@ -557,10 +673,14 @@ upload_setup_report() {
 
 | Setting | Value |
 |---------|-------|
-| **SSH Allowed Users** | ${SSH_ALLOWED_USERS:-svcops forge} |
+| **SSH Admin User** | ${SSH_ADMIN_USER:-svcops} |
+| **SSH Allowed Users** | ${SSH_ALLOWED_USERS:-${SSH_ADMIN_USER:-svcops}} |
+| **Forge Integration Enabled** | ${ENABLE_FORGE_INTEGRATION:-false} |
+| **Forge Root Match Enabled** | ${ENABLE_FORGE_ROOT_MATCH:-${ENABLE_FORGE_INTEGRATION:-false}} |
+| **Forge IPs** | ${FORGE_IPS:-159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124} |
 | **Fail2ban Max Retry** | ${FAIL2BAN_MAXRETRY:-6} |
 | **Fail2ban Ban Time** | ${FAIL2BAN_BANTIME:-86400}s (24 hours) |
-| **Fail2ban Ignore IPs** | ${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1 159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124} |
+| **Fail2ban Ignore IPs** | ${FAIL2BAN_IGNOREIP:-127.0.0.1/8 ::1} |
 | **UFW Allowed Ports** | ${UFW_ALLOWED_PORTS:-22 80 443} |
 
 ---
@@ -607,7 +727,7 @@ main() {
     log ""
     log "${BOLD}╔══════════════════════════════════════════════════════════════╗${NC}"
     log "${BOLD}║        TFS SERVER HARDENING - SETUP                          ║${NC}"
-    log "${BOLD}║        Version 1.0                                           ║${NC}"
+    log "${BOLD}║        Version 1.2.1                                         ║${NC}"
     log "${BOLD}╚══════════════════════════════════════════════════════════════╝${NC}"
     log ""
     log "Started: $(date)"
@@ -624,6 +744,7 @@ main() {
     
     # Apply hardening
     apply_ssh_hardening
+    check_forge_root_key
     apply_ufw
     apply_fail2ban
     apply_kernel_hardening

@@ -86,6 +86,36 @@ setup_reporting() {
     touch "$REPORT_FILE" 2>/dev/null || true
 }
 
+contains_space_list_item() {
+    local needle="$1"
+    local haystack="$2"
+    local item
+
+    for item in $haystack; do
+        if [[ "$item" == "$needle" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+sudo_nopasswd_line_is_expected() {
+    local line="$1"
+
+    # Azure cloud-init commonly grants the initial VM admin user passwordless sudo.
+    if [[ "$line" =~ (^|:)${SSH_ADMIN_USER}[[:space:]]+ALL= ]]; then
+        return 0
+    fi
+
+    # Laravel Forge installs scoped NOPASSWD rules for its managed service actions.
+    if [[ "$ENABLE_FORGE_INTEGRATION" == "true" && "$line" =~ (^|:)forge[[:space:]]+ALL ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
 # =============================================================================
 # LOAD CONFIGURATION
 # =============================================================================
@@ -429,7 +459,7 @@ check_fail2ban() {
             check_info "SSH jail ignoreip: $configured_ignoreip"
 
             for ip in $FAIL2BAN_IGNOREIP; do
-                if echo "$configured_ignoreip" | grep -qw "$ip"; then
+                if contains_space_list_item "$ip" "$configured_ignoreip"; then
                     check_pass "Fail2ban ignoreip includes $ip"
                 else
                     check_fail "Fail2ban ignoreip missing expected IP/range: $ip"
@@ -493,26 +523,28 @@ check_users() {
 
     log ""
     check_info "Users with NOPASSWD sudo:"
-    local forge_count=0
-    local other_found=false
+    local expected_count=0
+    local unexpected_found=false
+    local nopasswd_found=false
 
     while IFS= read -r line; do
         if [[ -n "$line" && ! "$line" =~ ^# ]]; then
-            if [[ "$ENABLE_FORGE_INTEGRATION" == "true" && "$line" =~ forge[[:space:]]ALL ]]; then
-                ((forge_count++)) || true
+            nopasswd_found=true
+
+            if sudo_nopasswd_line_is_expected "$line"; then
+                ((expected_count++)) || true
+                check_info "  Expected: $line"
             else
-                check_warn "  $line"
-                other_found=true
+                check_warn "  Unexpected: $line"
+                unexpected_found=true
             fi
         fi
     done < <(grep -r "NOPASSWD" /etc/sudoers /etc/sudoers.d/ 2>/dev/null | grep -v "^#" || true)
 
-    if [[ "$ENABLE_FORGE_INTEGRATION" == "true" && $forge_count -gt 0 ]]; then
-        check_info "  forge user has $forge_count NOPASSWD sudo rule(s) required for Laravel Forge functionality"
-    fi
-
-    if [[ "$other_found" == "false" && $forge_count -eq 0 ]]; then
+    if [[ "$nopasswd_found" == "false" ]]; then
         check_pass "  No NOPASSWD sudo entries found"
+    elif [[ "$unexpected_found" == "false" ]]; then
+        check_pass "  NOPASSWD sudo entries are expected for this server configuration ($expected_count found)"
     fi
 
     log ""

@@ -92,7 +92,7 @@ VERSION = "1.2.1"
 # Then update these values and commit everything together
 SCRIPT_CHECKSUMS = {
     'setup.sh': 'c4a69597bcdd5dbbd4116aef06b02243adce9605c329fb7155c7587a7563d099',
-    'verify.sh': '8621ee85925e7bc108d8f325944fca37734f4ce6aa66bfe0068f1196f6e57a91'
+    'verify.sh': 'd379d45ce431721f8248e1fc213cf55fae8ab4806392a5a9267666b5a32efcae'
 }
 
 # =============================================================================
@@ -2632,6 +2632,13 @@ TFS_SUBSCRIPTION_ID="{subscription_id}"
 SSH_ADMIN_USER="{admin_username}"
 SSH_ALLOWED_USERS="{admin_username} forge"
 SSH_PERMIT_ROOT_LOGIN="no"
+
+# Laravel Forge Integration
+# The builder provisions servers intended for Laravel Forge, so enable Forge-specific
+# SSH Match rules and fail2ban allowlisting when setup.sh is run after Forge provisioning.
+ENABLE_FORGE_INTEGRATION="true"
+ENABLE_FORGE_ROOT_MATCH="true"
+FORGE_IPS="159.203.150.232 165.227.248.218 159.203.150.216 45.55.124.124"
 
 # Storage Configuration
 TFS_STORAGE_ACCOUNT="{storage_info['name']}"

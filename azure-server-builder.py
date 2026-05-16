@@ -92,7 +92,7 @@ VERSION = "1.2.1"
 # Then update these values and commit everything together
 SCRIPT_CHECKSUMS = {
     'setup.sh': 'd845479297495f0b5c88a7e2554408f6d441cc9d4fe87310304a0a985e225743',
-    'verify.sh': '09d8b7b79202f064a6d2337afb43bc78dc22a6e081b4fd4376a8d51b7af35af6'
+    'verify.sh': '4cdc2516289cca602d0f08542f6f8bd6281259acb160dcd5893f27c8e40eec23'
 }
 
 # =============================================================================

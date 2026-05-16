@@ -111,6 +111,19 @@ normalize_fail2ban_ignoreip() {
     fi
 }
 
+normalize_ssh_value() {
+    local setting="$1"
+    local value="$2"
+
+    # OpenSSH may report PermitRootLogin prohibit-password as without-password.
+    # They are equivalent for our purposes: root login is key-only, not password-based.
+    if [[ "${setting,,}" == "permitrootlogin" && "$value" == "without-password" ]]; then
+        echo "prohibit-password"
+    else
+        echo "$value"
+    fi
+}
+
 sudo_nopasswd_line_is_expected() {
     local line="$1"
 
@@ -281,14 +294,21 @@ check_ssh() {
         local desc="$3"
 
         local current
-        current=$(sshd -T 2>/dev/null | grep -i "^${setting} " | awk '{print $2}')
+        local normalized_current
+        local normalized_expected
 
-        if [[ "${current,,}" == "${expected,,}" ]]; then
-            check_pass "$desc: $current"
-            return 0
+        current=$(sshd -T 2>/dev/null | grep -i "^${setting} " | awk '{print $2}')
+        normalized_current=$(normalize_ssh_value "$setting" "${current,,}")
+        normalized_expected=$(normalize_ssh_value "$setting" "${expected,,}")
+
+        if [[ "$normalized_current" == "$normalized_expected" ]]; then
+            if [[ "${current,,}" != "$normalized_current" ]]; then
+                check_pass "$desc: $current (equivalent to $normalized_current)"
+            else
+                check_pass "$desc: $current"
+            fi
         else
             check_fail "$desc: Expected '$expected', found '${current:-not set}'"
-            return 1
         fi
     }
 
